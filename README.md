@@ -1,8 +1,8 @@
 # PoseProbe 🌟  
-**Generic Objects as Pose Probes for Few-shot View Synthesis**  
+**Generic Objects as Pose Probes for Few-shot View Synthesis**  (accepted by <span style="color: #FF5733;">**IEEE TCSVT 2025**</span>) 
 
-🚀 ​**Official implementation of PoseProbe** (accepted by <span style="color: #FF5733;">**IEEE TCSVT 2025**</span>) using <span style="color: #FFC300;">**PyTorch**</span>.  
-✨ ​**Full Code is coming soon!** If you find this repository useful to your research or work, it is greatly appreciated to ​**star** this repository and ​**cite** our paper [here](##reference).  
+🚀 ​**Official implementation of PoseProbe** using <span style="color: #FFC300;">**PyTorch**</span>.  
+✨ ​**Full Code is coming soon!** If you find this repository useful to your research or work, it is greatly appreciated to ​**star** this repository and ​**cite** our paper.  
 
 ---
 
