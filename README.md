@@ -1,11 +1,5 @@
+# PoseProbe 🌟  
+**Generic Objects as Pose Probes for Few-shot View Synthesis**  
 
-<div align="center">
-
-<h1>Pose Probe Deform</h1>
-
-
-
-## Acknowledgement 
-Our code is heavily based on [DirectVoxGO](https://github.com/sunset1995/DirectVoxGO) and [NeuS](https://github.com/Totoro97/NeuS). Some of the preprocessing code is borrowed from [IDR](https://github.com/lioryariv/idr/blob/main/DATA_CONVENTION.md) and [LLFF](https://github.com/Fyusion/LLFF).
-Thanks to the authors for their awesome works and great implementations! Please check out their papers for more details.
-
+🚀 ​**Official implementation of PoseProbe** (accepted by <span style="color: #FF5733;">**IEEE TCSVT 2025**</span>) using <span style="color: #FFC300;">**PyTorch**</span>.  
+✨ ​**Full Code is coming soon!** If you find
