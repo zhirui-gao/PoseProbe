@@ -25,10 +25,10 @@ from lib.load_data import load_data
 from lib.utils import  get_root_logger
 from lib import camera, vgg_loss
 from easydict import EasyDict as edict
-from lib.mipnerf.utils.vis import visualize_depth
 from lib.nvs_fun import visualize_test_image
+from lib.utils_vis import visualize_depth
+import lib.voxurf_coarse as Model
 
-device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 
 @torch.no_grad()
 def cal_leading_eigenvector(M, method='power'):
@@ -60,9 +60,6 @@ def cal_leading_eigenvector(M, method='power'):
         exit(-1)
 
 def config_parser():
-    '''Define command line arguments
-    '''
-
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('--config', required=True,
                         help='config file path')
@@ -70,58 +67,27 @@ def config_parser():
                         help='Random seed')
     parser.add_argument("--no_reload", action='store_true',
                         help='do not reload weights from saved ckpt')
-    parser.add_argument("--no_reload_optimizer", action='store_true',
-                        help='do not reload optimizer state from saved ckpt')
-    parser.add_argument("--ft_path", type=str, default='',
-                        help='specific weights npy file to reload for coarse network')
-    parser.add_argument("--export_bbox_and_cams_only", type=str, default='',
-                        help='export scene bbox and camera poses for debugging and 3d visualization')
-    parser.add_argument("--export_coarse_only", type=str, default='')
-    parser.add_argument("--export_fine_only", type=str, default='')
-    parser.add_argument("--mesh_from_sdf", action='store_true')
-
     # testing options
     parser.add_argument("--render_only", action='store_true',
                         help='do not optimize, reload weights and render out render_poses path')
     parser.add_argument("--render_test", action='store_true')
     parser.add_argument("--render_train", action='store_true')
     parser.add_argument("--render_video", action='store_true')
-    parser.add_argument("--render_video_factor", type=int, default=0,
-                        help='downsampling factor to speed up rendering, set 4 or 8 for fast preview')
-    parser.add_argument("--eval_ssim", default=True)
-    parser.add_argument("--eval_lpips_alex", default=True)
-    parser.add_argument("--eval_lpips_vgg", default=True)
 
-    # logging/saving options
     parser.add_argument("--i_print", type=int, default=200,
                         help='frequency of console printout and metric loggin')
 
+    parser.add_argument("--inst_seg_tag", type=int, default=0,
+                        help='the id of pose probe for toydesk dataset')
+    parser.add_argument("--i_validate", type=int, default=5000,
+                        help='step of validating mesh')
     parser.add_argument("--i_validate_mesh", type=int, default=2000,
                         help='step of validating mesh')
 
-    parser.add_argument("--i_validate", type=int, default=5000)
-    parser.add_argument("--i_weights", type=int, default=10000,
-                        help='frequency of weight ckpt saving')
     parser.add_argument("-s", "--suffix", type=str, default="",
                         help='suffix for exp name')
     parser.add_argument("-p", "--prefix", type=str, default="",
                         help='prefix for exp name')
-    parser.add_argument("--load_density_only", type=int, default=1)
-    parser.add_argument("--load_expname", type=str, default="")
-    parser.add_argument("--inst_seg_tag", type=int, default=1)
-    parser.add_argument("--scene", type=str, default=0)
-    parser.add_argument("--smooth_depth", type=float, default=0.1)
-    parser.add_argument("--no_dvgo_init", action='store_true')
-    parser.add_argument("--run_dvgo_init", action='store_true')
-    parser.add_argument("--interpolate", default='0_1')
-    parser.add_argument("--extract_color", action='store_true')
-    parser.add_argument("--barf_opt", type=str, default='./lib/barf_model/barf_acc.yaml')
-    parser.add_argument("--out_dir", help="Output directory.", type=str, default='./out')
-    parser.add_argument("--dataset_name", help="Single or multi data.", type=str, default="blender")
-    parser.add_argument("--mip_config", help="Path to config file.", required=False, default='./lib/mipnerf/configs/')
-    parser.add_argument("--opts", nargs=argparse.REMAINDER,default=None,
-                        help="Modify hparams. Example: train.py resume out_dir TRAIN.BATCH_SIZE 2")
-
     return parser
 
 
@@ -198,9 +164,6 @@ def load_everything(args, cfg, device):
         if k not in kept_keys:
             data_dict.pop(k)
     vgg_model.to(device)
-    # vgg_features = vgg_model.get_multi_features(torch.tensor(data_dict['images'][data_dict['i_train']]))
-    # data_dict['vgg_features'] = vgg_features
-    # construct data tensor
     if data_dict['irregular_shape']:
         data_dict['images'] = [torch.FloatTensor(im, device='cpu').cuda() for im in data_dict['images']]
         data_dict['masks'] = [torch.FloatTensor(im, device='cpu').cuda() for im in data_dict['masks']]
@@ -336,10 +299,6 @@ def get_overlap_region(points1, points2, tol=1e-5):
 
 
 
-
-
-
-
 def train(args, cfg, data_dict):
     # init
     logger.info('train: start')
@@ -352,21 +311,20 @@ def train(args, cfg, data_dict):
 
     xyz_min_fine, xyz_max_fine = torch.tensor(cfg.data.xyz_min).cuda(), torch.tensor(cfg.data.xyz_max).cuda()
 
-    if hasattr(cfg, 'surf_train'):
-        eps_surf = time.time()
-        recon = scene_rep_reconstruction(
-            args=args, cfg=cfg, logger=logger,
-            cfg_model=cfg.surf_model_and_render, cfg_train=cfg.surf_train,
-            xyz_min=xyz_min_fine, xyz_max=xyz_max_fine,
-            data_dict=data_dict, stage='surf')
-        recon.forward()
-        eps_surf = time.time() - eps_surf
-        eps_time_str = f'{eps_surf//3600:02.0f}:{eps_surf//60%60:02.0f}:{eps_surf%60:02.0f}'
-        logger.info("+ "*10 + 'train: fine detail reconstruction in' + eps_time_str + " +"*10 )
+    eps_surf = time.time()
+    recon = scene_rep_reconstruction(
+        args=args, cfg=cfg, logger=logger,
+        cfg_model=cfg.surf_model_and_render, cfg_train=cfg.surf_train,
+        xyz_min=xyz_min_fine, xyz_max=xyz_max_fine,
+        data_dict=data_dict, stage='surf')
+    recon.forward()
+    eps_surf = time.time() - eps_surf
+    eps_time_str = f'{eps_surf//3600:02.0f}:{eps_surf//60%60:02.0f}:{eps_surf%60:02.0f}'
+    logger.info("+ "*10 + 'train: fine detail reconstruction in' + eps_time_str + " +"*10 )
 
-        eps_time = time.time() - eps_time
-        eps_time_str = f'{eps_time//3600:02.0f}:{eps_time//60%60:02.0f}:{eps_time%60:02.0f}'
-        logger.info('train: finish (eps time' + eps_time_str + ')')
+    eps_time = time.time() - eps_time
+    eps_time_str = f'{eps_time//3600:02.0f}:{eps_time//60%60:02.0f}:{eps_time%60:02.0f}'
+    logger.info('train: finish (eps time' + eps_time_str + ')')
 
 
 
@@ -376,14 +334,9 @@ if __name__=='__main__':
     args = parser.parse_args()
     cfg = config.Config.fromfile(args.config)
     cfg.data.inst_seg_tag = args.inst_seg_tag
-    if args.scene:
-        cfg.expname += "{}".format(args.scene)
-        cfg.data.datadir += "{}".format(args.scene)
-    else:
-        cfg.data.datadir += "{}".format(cfg.expname)
+    cfg.data.datadir += "{}".format(cfg.expname)
     if args.suffix:
         cfg.expname += "_" + args.suffix
-    cfg.load_expname = args.load_expname if args.load_expname else cfg.expname
     if args.prefix:
         cfg.basedir = os.path.join(cfg.basedir, args.prefix)
     log_dir = os.path.join(cfg.basedir, cfg.expname, 'log')
@@ -401,46 +354,21 @@ if __name__=='__main__':
     else:
         device = torch.device('cpu')
     seed_everything()
-    if getattr(cfg, 'load_expname', None) is None:
-        cfg.load_expname = args.load_expname if args.load_expname else cfg.expname
-    logger.info(cfg.load_expname)
+
     os.makedirs(os.path.join(cfg.basedir, cfg.expname, 'recording'), exist_ok=True)
-    if not args.render_only or args.mesh_from_sdf:
+    if not args.render_only:
         copyfile('run.py', os.path.join(cfg.basedir, cfg.expname, 'recording', 'run.py'))
         copyfile(args.config, os.path.join(cfg.basedir, cfg.expname, 'recording', args.config.split('/')[-1]))
-
-    import lib.voxurf_coarse as Model
-    copyfile('lib/voxurf_coarse.py', os.path.join(cfg.basedir, cfg.expname, 'recording','voxurf_coarse.py'))
-
+        copyfile('lib/voxurf_coarse.py', os.path.join(cfg.basedir, cfg.expname, 'recording', 'voxurf_coarse.py'))
 
     # load images / poses / camera settings / data split
     data_dict = load_everything(args=args, cfg=cfg, device=device)
-
-    # export scene bbox and camera poses in 3d for debugging and visualization
-    if args.export_bbox_and_cams_only:
-        logger.info('Export bbox and cameras...')
-        xyz_min, xyz_max = compute_bbox_by_cam_frustrm(args=args, cfg=cfg, **data_dict)
-        poses, HW, Ks, i_train = data_dict['poses'], data_dict['HW'], data_dict['Ks'], data_dict['i_train']
-        near, far = data_dict['near'], data_dict['far']
-        cam_lst = []
-        for c2w, (H, W), K in zip(poses[i_train], HW[i_train], Ks[i_train]):
-            rays_o, rays_d, viewdirs = Model.get_rays_of_a_view(
-                H, W, K, c2w, cfg.data.ndc, inverse_y=cfg.data.inverse_y,
-                flip_x=cfg.data.flip_x, flip_y=cfg.data.flip_y,)
-            cam_o = rays_o[0,0].cpu().numpy()
-            cam_d = rays_d[[0,0,-1,-1],[0,-1,0,-1]].cpu().numpy()
-            cam_lst.append(np.array([cam_o, *(cam_o+cam_d*max(near, far*0.05))]))
-        np.savez_compressed(args.export_bbox_and_cams_only,
-                            xyz_min=xyz_min.cpu().numpy(), xyz_max=xyz_max.cpu().numpy(),
-                            cam_lst=np.array(cam_lst))
-        logger.info('done')
-        sys.exit()
 
     # train
     if not args.render_only:
         train(args, cfg, data_dict)
 
-    # load model for rendring
+    # load model for rendering
     if args.render_test or args.render_train or args.render_video or args.interpolate:
         if args.ft_path:
             ckpt_path = args.ft_path
@@ -481,9 +409,11 @@ if __name__=='__main__':
             },
         }
     optimized_poses = optimized_poses.detach()
+
     if cfg.data.dataset_type=='custom':
         data_dict['poses'][data_dict['i_train']] = optimized_poses
-    # render trainset and eval
+
+
     if args.render_train:
         testsavedir = os.path.join(cfg.basedir, cfg.expname, f'render_train_{ckpt_name}')
         os.makedirs(testsavedir, exist_ok=True)
