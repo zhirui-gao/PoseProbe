@@ -34,7 +34,9 @@ We leverage ​**generic objects** ​**in few-view input images** as ​**pose 
 
 ```python run.py --config configs/dtu_e2e/scan1.py -p test --render_video```
 
+## 🔑 View Synthesis on DTU from 3 Input Views
 
+[scan1](assets/demo.mp4)
 
 ## 📚 Reference  
 If you find this code useful for your research, please use the following BibTeX entry:  
