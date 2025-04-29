@@ -1,12 +1,11 @@
 
 import os
-from typing import Callable, Sequence, List, Mapping, MutableMapping, Tuple, Union, Dict
-from typing import Any, Optional
+from typing import Any
+from typing import Dict
 
+from lib.bg_nerf.source.training.joint_pose_nerf_trainer import PoseAndNerfTrainerPerScene
 from lib.bg_nerf.source.training.nerf_trainer import NerfTrainerPerScene
 from lib.bg_nerf.source.training.nerf_trainer_w_fixed_colmap_poses import NerfTrainerPerSceneWColmapFixedPoses
-from lib.bg_nerf.source.training.joint_pose_nerf_trainer import PoseAndNerfTrainerPerScene
-
 from lib.bg_nerf.source.utils.config_utils import save_options_file
 
 
@@ -45,7 +44,7 @@ def define_trainer(args: Dict[str, Any], settings_model: Dict[str, Any],
             if settings_model.train_sub == 2:
                 settings_model.max_iter = 60000
             elif settings_model.train_sub == 3:
-                settings_model.max_iter = 15000 #100000
+                settings_model.max_iter = 60000
             elif settings_model.train_sub == 6:
                 settings_model.max_iter = 150000
             else:

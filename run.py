@@ -370,12 +370,9 @@ if __name__=='__main__':
 
     # load model for rendering
     if args.render_test or args.render_train or args.render_video or args.interpolate:
-        if args.ft_path:
-            ckpt_path = args.ft_path
-            new_kwargs = cfg.fine_model_and_render
-        else:
-            ckpt_path = os.path.join(cfg.basedir, cfg.expname, 'last_ckpt.tar')
-            new_kwargs = cfg.surf_model_and_render
+
+        ckpt_path = os.path.join(cfg.basedir, cfg.expname, 'last_ckpt.tar')
+        new_kwargs = cfg.surf_model_and_render
 
         ckpt_name = ckpt_path.split('/')[-1][:-4]
         model,optimized_poses = utils.load_model(Model.Voxurf, ckpt_path, new_kwargs)
