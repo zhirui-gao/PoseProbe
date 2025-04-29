@@ -30,7 +30,7 @@ We leverage ​**generic objects** ​**in few-view input images** as ​**pose 
 
 ---
 
-## 🔑 Train 
+## 🔑 Train a scene of DTU
 
 ```python run.py --config configs/dtu_e2e/scan1.py -p test --render_video```
 
