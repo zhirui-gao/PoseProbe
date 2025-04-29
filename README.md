@@ -36,7 +36,7 @@ We leverage ​**generic objects** ​**in few-view input images** as ​**pose 
 
 ## 🔑 View Synthesis on DTU from 3 Input Views
 
-![scan1](assets/scan1.gif)
+![scan1](asset/scan1.gif)
 
 ## 📚 Reference  
 If you find this code useful for your research, please use the following BibTeX entry:  
